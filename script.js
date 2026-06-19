@@ -1,82 +1,92 @@
+import { draw, start_camera } from './draw.js';
+
 // ── Settings ──────────────────────────────────
 const canvas_w   = 640;
 const canvas_h   = 480;
 const fruit_size = 38;
-const spawn_wait = 2500;   // wait longer before next fruit
-const speed_min  = 1.2;    // fruits fall slower
+const spawn_wait = 2500;
+
+const speed_min  = 1.2;
 const speed_max  = 2.5;
 const max_lives  = 3;
 const trail_len  = 18;
 
 const fruit_list = [
   { emoji: "🍉", label: "watermelon" },
-  { emoji: "🍊", label: "orange"     },
-  { emoji: "🍎", label: "apple"      },
-  { emoji: "🍋", label: "lemon"      },
-  { emoji: "🍇", label: "grape"      },
+  { emoji: "🍊", label: "orange" },
+  { emoji: "🍎", label: "apple" },
+  { emoji: "🍋", label: "lemon" },
+  { emoji: "🍇", label: "grape" },
   { emoji: "🍓", label: "strawberry" },
-  { emoji: "🍑", label: "peach"      },
-  { emoji: "💣", label: "bomb"       },
+  { emoji: "🍑", label: "peach" },
+  { emoji: "💣", label: "bomb" },
 ];
 
 
-// ── Canvas + camera elements ───────────────────
+// ── Canvas + elements ──────────────────────────────────
 const canvas   = document.getElementById("output-canvas");
 const ctx      = canvas.getContext("2d");
 const video_el = document.getElementById("input-video");
 
 
-// ── Game data ───────────────────────────────────
+// ── Game data ──────────────────────────────────
 let fruits, trail, popups, score, lives, game_over, last_drop;
 let finger_x = null;
 let finger_y = null;
 
 
-// 1️⃣ Reset the game back to the start (simplest function — just sets values)
+// 1️⃣ Reset game
 function new_game() {
-  fruits    = [];
-  trail     = [];
-  popups    = [];
-  score     = 0;
-  lives     = max_lives;
+  fruits = [];
+  trail = [];
+  popups = [];
+
+  score = 0;
+  lives = max_lives;
   game_over = false;
+
   last_drop = performance.now();
 }
 
 
-// 2️⃣ Drop one fruit from the top at a random spot
+// 2️⃣ Drop fruit
 function drop_fruit() {
-  const pick = fruit_list[Math.floor(Math.random() * fruit_list.length)];  
-  fruits.push({ //add a new fruit object into the fruits array
-    x:      Math.random() * (canvas_w - fruit_size * 2) + fruit_size,
-    y:      -fruit_size,
+  const pick = fruit_list[Math.floor(Math.random() * fruit_list.length)];
+
+  fruits.push({
+    x: Math.random() * (canvas_w - fruit_size * 2) + fruit_size,
+    y: -fruit_size,
     speedX: (Math.random() - 0.5) * 2.5,
     speedY: speed_min + Math.random() * (speed_max - speed_min),
-    emoji:  pick.emoji,
-    label:  pick.label,
+    emoji: pick.emoji,
+    label: pick.label,
   });
 }
 
 
-// 3️⃣ Move every fruit down; remove the ones that fall off screen
+// 3️⃣ Move fruits
 function move_fruits() {
   fruits = fruits.filter(f => {
     f.x += f.speedX;
     f.y += f.speedY;
+
     if (f.y > canvas_h + fruit_size) {
-      if (f.label !== "bomb") lives--;   // missed a fruit → lose a life
+      if (f.label !== "bomb") lives--;
       return false;
     }
+
     return true;
   });
 }
 
 
-// 4️⃣ Check if the finger is touching any fruit or bomb
+// 4️⃣ Slice check
 function check_slices() {
   if (finger_x === null) return;
+
   fruits = fruits.filter(f => {
     const distance = Math.hypot(finger_x - f.x, finger_y - f.y);
+
     if (distance < fruit_size) {
       if (f.label === "bomb") {
         game_over = true;
@@ -84,106 +94,15 @@ function check_slices() {
         score++;
         popups.push({ x: f.x, y: f.y, born: performance.now() });
       }
-      return false;   // remove the sliced item
+      return false;
     }
+
     return true;
   });
 }
 
-// 5️⃣ Open the camera and track the index finger
-function start_camera() {
-  const hands = new Hands({
-    locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`,
-  });
-  hands.setOptions({
-    maxNumHands:            1,
-    modelComplexity:        1,
-    minDetectionConfidence: 0.6,
-    minTrackingConfidence:  0.5,
-  });
-  hands.onResults(results => {
-    finger_x = null;
-    finger_y = null;
-    if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-      const tip = results.multiHandLandmarks[0][8];   // index fingertip
-      finger_x  = (1 - tip.x) * canvas_w;               // flip to match mirror
-      finger_y  = tip.y * canvas_h;
-    }
-  });
-  new Camera(video_el, {
-    onFrame: async () => { await hands.send({ image: video_el }); },
-    width: canvas_w, height: canvas_h,
-  }).start();
-}
 
-
-// 6️⃣ Draw everything on the screen (the biggest function — draws each piece)
-function draw(now) {
-  // camera feed, mirrored
-  ctx.save();
-  ctx.scale(-1, 1);
-  ctx.drawImage(video_el, -canvas_w, 0, canvas_w, canvas_h);
-  ctx.restore();
-
-  // fruits
-  ctx.font = `${fruit_size * 1.5}px serif`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  for (const f of fruits) {
-    ctx.fillText(f.emoji, f.x, f.y);
-  }
-
-  // glowing trail behind the finger
-  for (let i = 1; i < trail.length; i++) {
-    const a = trail[i - 1], b = trail[i];
-    if (!a || !b) continue;
-    const p = i / trail.length;
-    ctx.beginPath();
-    ctx.moveTo(a.x, a.y);
-    ctx.lineTo(b.x, b.y);
-    ctx.strokeStyle = `rgba(0,255,220,${p})`;
-    ctx.lineWidth = p * 10;
-    ctx.lineCap = "round";
-    ctx.stroke();
-  }
-
-  // "+1" popups that float upward
-  popups = popups.filter(p => {
-    const t = (now - p.born) / 500;
-    if (t >= 1) return false;
-    ctx.save();
-    ctx.globalAlpha = 1 - t;
-    ctx.font = "bold 28px Segoe UI";
-    ctx.fillStyle = "#00ffcc";
-    ctx.fillText("+1", p.x, p.y - t * 70);
-    ctx.restore();
-    return true;
-  });
-
-  // glowing fingertip dot
-  if (finger_x !== null) {
-    const glow = ctx.createRadialGradient(finger_x, finger_y, 2, finger_x, finger_y, 26);
-    glow.addColorStop(0, "rgba(0,255,200,1)");
-    glow.addColorStop(1, "rgba(0,255,200,0)");
-    ctx.fillStyle = glow;
-    ctx.beginPath();
-    ctx.arc(finger_x, finger_y, 26, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = "#fff";
-    ctx.beginPath();
-    ctx.arc(finger_x, finger_y, 8, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // score and lives
-  document.getElementById("score-label").textContent = `Score: ${score}`;
-  document.getElementById("lives-label").textContent =
-    "❤️".repeat(lives) + "🖤".repeat(max_lives - lives);
-}
-
-
-// 7️⃣ The main game loop — ties everything above together
+// 7️⃣ Game loop
 function game_loop() {
   const now = performance.now();
 
@@ -198,33 +117,54 @@ function game_loop() {
   trail.push(finger_x !== null ? { x: finger_x, y: finger_y } : null);
   if (trail.length > trail_len) trail.shift();
 
-  draw(now);
+  const result = draw(now, {
+    ctx, video_el, canvas_w, canvas_h, fruit_size, max_lives,
+    fruits, trail, popups, score, lives, finger_x, finger_y
+  });
+
+  popups = result.updatedPopups;
 
   if (lives <= 0 || game_over) {
     show_game_over();
-    return;   // stop the loop — game is over!
+    return;
   }
 
   requestAnimationFrame(game_loop);
 }
 
 
-// 8️⃣ Show the Game Over screen
+// 8️⃣ Game over
 function show_game_over() {
-  document.getElementById("final-score-text").textContent = `Final Score: ${score}`;
+  document.getElementById("final-score-text").textContent =
+    `Final Score: ${score}`;
+
   document.getElementById("gameover-overlay").classList.remove("hidden");
 }
 
-// 9️⃣ Start and Restart — the hardest functions, since they kick off everything else
+
+// 9️⃣ Start game
 function start_game() {
   document.getElementById("start-overlay").classList.add("hidden");
+
   new_game();
-  start_camera();
+
+  start_camera(video_el, canvas_w, canvas_h, (x, y) => {
+    finger_x = x;
+    finger_y = y;
+  });
+
   requestAnimationFrame(game_loop);
 }
 
+
+// restart
 function restart_game() {
   document.getElementById("gameover-overlay").classList.add("hidden");
+
   new_game();
+
   requestAnimationFrame(game_loop);
 }
+
+window.start_game = start_game;
+window.restart_game = restart_game;
