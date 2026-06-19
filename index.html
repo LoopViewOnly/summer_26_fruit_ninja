@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- MediaPipe Hands — lets us track your hand using the camera -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+  <title>Loop Fruit Ninja</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <img id="logo" src="https://loopviewonly.github.io/speed-typing/looplogo.png" alt="Loop Logo">
+  <h1>Fruit Ninja</h1>
+  <p class="subtitle">Slice fruit with your index finger</p>
+
+  <div id="hud">
+    <div id="score-label">Score: 0</div>
+    <div id="lives-label">❤️❤️❤️</div>
+  </div>
+
+  <div id="canvas-wrap">
+    <video id="input-video" playsinline></video>
+    <canvas id="output-canvas" width="640" height="480"></canvas>
+
+    <div class="overlay" id="start-overlay">
+      <div class="overlay-title">🍉🍊🍎</div>
+      <div class="overlay-title">Loop Fruit Ninja</div>
+      <button class="btn" onclick="start_game()">▶ Start Game</button>
+    </div>
+
+    <div class="overlay hidden" id="gameover-overlay">
+      <div class="overlay-title" style="color:#ff4444">GAME OVER</div>
+      <div class="final-score" id="final-score-text">Score: 0</div>
+      <button class="btn" onclick="restart_game()">🔄 Play Again</button>
+    </div>
+  </div>
+
+<script src="script.js"></script>
+</body>
+</html>
